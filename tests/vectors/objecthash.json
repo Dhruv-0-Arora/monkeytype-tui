@@ -1,0 +1,538 @@
+[
+  {
+    "name": "number_zero",
+    "value": 0,
+    "serialized": "number:0",
+    "hash": "2e1cc5d852d9f51ffd88c7cb6e17a39f133a4f4e"
+  },
+  {
+    "name": "number_one",
+    "value": 1,
+    "serialized": "number:1",
+    "hash": "7b343448ed87b254b79eba27bc18c21b2f985f0c"
+  },
+  {
+    "name": "number_negative_one",
+    "value": -1,
+    "serialized": "number:-1",
+    "hash": "a887b98339dfd03322b93b8a9cdac594f69aee4c"
+  },
+  {
+    "name": "number_one_point_zero",
+    "value": 1,
+    "serialized": "number:1",
+    "hash": "7b343448ed87b254b79eba27bc18c21b2f985f0c"
+  },
+  {
+    "name": "number_decimal",
+    "value": 92.5,
+    "serialized": "number:92.5",
+    "hash": "e96efd060affe96c64001e4a65fc6f3294ab62a4"
+  },
+  {
+    "name": "number_negative_decimal",
+    "value": -92.5,
+    "serialized": "number:-92.5",
+    "hash": "80a3c790f5d583e2148d73ca410e38e5abdae9d7"
+  },
+  {
+    "name": "number_duration_boundary",
+    "value": 122.01,
+    "serialized": "number:122.01",
+    "hash": "063cf0bb763c9f876776f9ded68b5b5b87938a25"
+  },
+  {
+    "name": "number_float_artifact",
+    "value": 0.30000000000000004,
+    "serialized": "number:0.30000000000000004",
+    "hash": "0dea9b6f6f26d3049f0a024d88cff563a8b02d16"
+  },
+  {
+    "name": "number_tiny_exponent",
+    "value": 1e-7,
+    "serialized": "number:1e-7",
+    "hash": "be4f31fab69fba9a1a283905893e6b05687a7c57"
+  },
+  {
+    "name": "number_smallest_positional",
+    "value": 0.000001,
+    "serialized": "number:0.000001",
+    "hash": "4b106ff225a5723c44c543bad4bea0292c0f3955"
+  },
+  {
+    "name": "number_large_positional",
+    "value": 100000000000000000000,
+    "serialized": "number:100000000000000000000",
+    "hash": "5d373ee883fc3c6ea09937bc2f47e145c711d70c"
+  },
+  {
+    "name": "number_first_exponential",
+    "value": 1e+21,
+    "serialized": "number:1e+21",
+    "hash": "9155a4bc16defb2ac00a1ddebb03a2616804aab9"
+  },
+  {
+    "name": "number_max_safe_plus_one",
+    "value": 9007199254740992,
+    "serialized": "number:9007199254740992",
+    "hash": "ffc65a899650bbeb66a5c0360dc08f5064bb9770"
+  },
+  {
+    "name": "number_u64_max",
+    "value": 18446744073709552000,
+    "serialized": "number:18446744073709552000",
+    "hash": "547d13cfd8db6141b1fd62f6dfaa7c565cd0d3f4"
+  },
+  {
+    "name": "string_empty",
+    "value": "",
+    "serialized": "string:0:",
+    "hash": "67cbf865735ab20856e1e6649eab1c4073bc341e"
+  },
+  {
+    "name": "string_hello",
+    "value": "hello",
+    "serialized": "string:5:hello",
+    "hash": "f3584f1b4c5b81a19f1849be114ddbc532dc77f7"
+  },
+  {
+    "name": "string_unicode",
+    "value": "héllo😀",
+    "serialized": "string:7:héllo😀",
+    "hash": "43c177c3ca3b441197ebc0b12563944cc3ae13f1"
+  },
+  {
+    "name": "string_grammar_chars",
+    "value": "with:colons,and,commas",
+    "serialized": "string:22:with:colons,and,commas",
+    "hash": "121daa1e2a9509b22c1ab5e8b8ff0784266d75ee"
+  },
+  {
+    "name": "bool_true",
+    "value": true,
+    "serialized": "bool:true",
+    "hash": "cdf22d2a18b96ef07f6105cd8093ae12a8772cb3"
+  },
+  {
+    "name": "bool_false",
+    "value": false,
+    "serialized": "bool:false",
+    "hash": "b29c63990dea846689120516761de20c056e3539"
+  },
+  {
+    "name": "null",
+    "value": null,
+    "serialized": "Null",
+    "hash": "109085beaaa80ac89858b283a64f7c75d7e5bb12"
+  },
+  {
+    "name": "array_empty",
+    "value": [],
+    "serialized": "array:0:",
+    "hash": "989db2448f309bfdd99b513f37c84b8f5794d2b5"
+  },
+  {
+    "name": "object_empty",
+    "value": {},
+    "serialized": "object:3:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],",
+    "hash": "323217f643c3e3f1fe7532e72ac01bb0748c97be"
+  },
+  {
+    "name": "array_numbers",
+    "value": [
+      1,
+      2,
+      3
+    ],
+    "serialized": "array:3:number:1number:2number:3",
+    "hash": "a2fc48da101b2469cbb9b3e4c38e01e0c45ba127"
+  },
+  {
+    "name": "array_of_objects",
+    "value": [
+      {
+        "a": 1
+      },
+      {
+        "b": [
+          2,
+          3
+        ]
+      },
+      {}
+    ],
+    "serialized": "array:3:object:4:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:3],string:1:a:number:1,object:4:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:2],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:3],string:1:b:array:2:number:2number:3,object:3:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:2],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:3],",
+    "hash": "a1fe3cdf589ad10f11b4f159c478a7537cff2e85"
+  },
+  {
+    "name": "object_key_sort",
+    "value": {
+      "9": 4,
+      "10": 3,
+      "Z": 1,
+      "a": 2
+    },
+    "serialized": "object:7:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:2:10:number:3,string:1:9:number:4,string:1:Z:number:1,string:1:a:number:2,",
+    "hash": "8c0ad1bf6bffc4a220e2d8d7dfdc7acb6ca8c4e9"
+  },
+  {
+    "name": "object_nested_deep",
+    "value": {
+      "outer": {
+        "mid": {
+          "inner": [
+            1,
+            {
+              "leaf": null
+            }
+          ]
+        }
+      }
+    },
+    "serialized": "object:4:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:5:outer:object:4:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:3:mid:object:4:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:5:inner:array:2:number:1object:4:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:4:leaf:Null,,,,",
+    "hash": "f4bfa85234ca55b706cb32b75b8ec6bcecdebb29"
+  },
+  {
+    "name": "object_empty_containers",
+    "value": {
+      "arr": [],
+      "obj": {},
+      "s": ""
+    },
+    "serialized": "object:6:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:3:arr:array:0:,string:3:obj:object:3:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],,string:1:s:string:0:,",
+    "hash": "be545db585d9937085b3d9dcf0aede9b9efa64cf"
+  },
+  {
+    "name": "completed_event_time30",
+    "value": {
+      "acc": 97.62,
+      "afkDuration": 0,
+      "bailedOut": false,
+      "blindMode": false,
+      "charStats": [
+        148,
+        3,
+        1,
+        2
+      ],
+      "charTotal": 152,
+      "chartData": {
+        "wpm": [
+          58,
+          61,
+          60,
+          62,
+          63,
+          61,
+          60,
+          62,
+          61,
+          60,
+          61,
+          62,
+          60,
+          59,
+          61,
+          62,
+          61,
+          60,
+          62,
+          61,
+          60,
+          61,
+          62,
+          61,
+          60,
+          61,
+          62,
+          61,
+          60,
+          61
+        ],
+        "burst": [
+          60,
+          64,
+          58,
+          66,
+          62,
+          60,
+          58,
+          64,
+          62,
+          58,
+          62,
+          64,
+          56,
+          54,
+          62,
+          64,
+          62,
+          58,
+          64,
+          62,
+          58,
+          62,
+          64,
+          62,
+          58,
+          62,
+          64,
+          62,
+          58,
+          62
+        ],
+        "err": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "consistency": 84.32,
+      "difficulty": "normal",
+      "funbox": [],
+      "incompleteTestSeconds": 0,
+      "incompleteTests": [],
+      "keyConsistency": 71.18,
+      "keyDuration": [
+        95.2,
+        88.7,
+        102.3,
+        91.1,
+        87.9
+      ],
+      "keyOverlap": 12.34,
+      "keySpacing": [
+        201.5,
+        189.99,
+        210.01,
+        195.3,
+        188.8
+      ],
+      "language": "english",
+      "lastKeyToEnd": 152.34,
+      "lazyMode": false,
+      "mode": "time",
+      "mode2": "30",
+      "numbers": false,
+      "punctuation": false,
+      "rawWpm": 61.2,
+      "restartCount": 0,
+      "startToFirstKey": 0,
+      "stopOnLetter": false,
+      "tags": [],
+      "testDuration": 30,
+      "timestamp": 1751846400000,
+      "uid": "AbCdEf0123456789AbCdEf0123456789",
+      "wpm": 59.19,
+      "wpmConsistency": 88.5
+    },
+    "serialized": "object:36:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:3:acc:number:97.62,string:11:afkDuration:number:0,string:9:bailedOut:bool:false,string:9:blindMode:bool:false,string:9:charStats:array:4:number:148number:3number:1number:2,string:9:charTotal:number:152,string:9:chartData:object:6:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:5:burst:array:30:number:60number:64number:58number:66number:62number:60number:58number:64number:62number:58number:62number:64number:56number:54number:62number:64number:62number:58number:64number:62number:58number:62number:64number:62number:58number:62number:64number:62number:58number:62,string:3:err:array:30:number:0number:0number:1number:0number:0number:0number:1number:0number:0number:0number:0number:0number:1number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0,string:3:wpm:array:30:number:58number:61number:60number:62number:63number:61number:60number:62number:61number:60number:61number:62number:60number:59number:61number:62number:61number:60number:62number:61number:60number:61number:62number:61number:60number:61number:62number:61number:60number:61,,string:11:consistency:number:84.32,string:10:difficulty:string:6:normal,string:6:funbox:array:0:,string:21:incompleteTestSeconds:number:0,string:15:incompleteTests:array:0:,string:14:keyConsistency:number:71.18,string:11:keyDuration:array:5:number:95.2number:88.7number:102.3number:91.1number:87.9,string:10:keyOverlap:number:12.34,string:10:keySpacing:array:5:number:201.5number:189.99number:210.01number:195.3number:188.8,string:8:language:string:7:english,string:12:lastKeyToEnd:number:152.34,string:8:lazyMode:bool:false,string:4:mode:string:4:time,string:5:mode2:string:2:30,string:7:numbers:bool:false,string:11:punctuation:bool:false,string:6:rawWpm:number:61.2,string:12:restartCount:number:0,string:15:startToFirstKey:number:0,string:12:stopOnLetter:bool:false,string:4:tags:array:0:,string:12:testDuration:number:30,string:9:timestamp:number:1751846400000,string:3:uid:string:32:AbCdEf0123456789AbCdEf0123456789,string:3:wpm:number:59.19,string:14:wpmConsistency:number:88.5,",
+    "hash": "603eafa23b14304cf5916aeaf6619697ac56495b"
+  },
+  {
+    "name": "completed_event_words25",
+    "value": {
+      "acc": 100,
+      "afkDuration": 0,
+      "bailedOut": false,
+      "blindMode": false,
+      "charStats": [
+        130,
+        0,
+        0,
+        0
+      ],
+      "charTotal": 130,
+      "chartData": {
+        "wpm": [
+          55,
+          57,
+          58,
+          57,
+          58,
+          59,
+          58,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58,
+          59,
+          58
+        ],
+        "burst": [
+          55,
+          59,
+          60,
+          54,
+          62,
+          63,
+          52,
+          58,
+          63,
+          50,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52,
+          63,
+          52
+        ],
+        "err": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "consistency": 90.11,
+      "difficulty": "normal",
+      "funbox": [],
+      "incompleteTestSeconds": 0,
+      "incompleteTests": [],
+      "keyConsistency": 75.4,
+      "keyDuration": [],
+      "keyOverlap": 0,
+      "keySpacing": [
+        180.1,
+        190.25,
+        200.4
+      ],
+      "language": "english",
+      "lastKeyToEnd": 98.7,
+      "lazyMode": false,
+      "mode": "words",
+      "mode2": "25",
+      "numbers": false,
+      "punctuation": false,
+      "rawWpm": 58,
+      "restartCount": 0,
+      "startToFirstKey": 0,
+      "stopOnLetter": false,
+      "tags": [],
+      "testDuration": 26.91,
+      "timestamp": 1751846500000,
+      "uid": "AbCdEf0123456789AbCdEf0123456789",
+      "wpm": 58,
+      "wpmConsistency": 91.02
+    },
+    "serialized": "object:36:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:3:acc:number:100,string:11:afkDuration:number:0,string:9:bailedOut:bool:false,string:9:blindMode:bool:false,string:9:charStats:array:4:number:130number:0number:0number:0,string:9:charTotal:number:130,string:9:chartData:object:6:string:9:prototype:Undefined,string:9:__proto__:string:12:[CIRCULAR:1],string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:5:burst:array:26:number:55number:59number:60number:54number:62number:63number:52number:58number:63number:50number:63number:52number:63number:52number:63number:52number:63number:52number:63number:52number:63number:52number:63number:52number:63number:52,string:3:err:array:26:number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0number:0,string:3:wpm:array:26:number:55number:57number:58number:57number:58number:59number:58number:58number:59number:58number:59number:58number:59number:58number:59number:58number:59number:58number:59number:58number:59number:58number:59number:58number:59number:58,,string:11:consistency:number:90.11,string:10:difficulty:string:6:normal,string:6:funbox:array:0:,string:21:incompleteTestSeconds:number:0,string:15:incompleteTests:array:0:,string:14:keyConsistency:number:75.4,string:11:keyDuration:array:0:,string:10:keyOverlap:number:0,string:10:keySpacing:array:3:number:180.1number:190.25number:200.4,string:8:language:string:7:english,string:12:lastKeyToEnd:number:98.7,string:8:lazyMode:bool:false,string:4:mode:string:5:words,string:5:mode2:string:2:25,string:7:numbers:bool:false,string:11:punctuation:bool:false,string:6:rawWpm:number:58,string:12:restartCount:number:0,string:15:startToFirstKey:number:0,string:12:stopOnLetter:bool:false,string:4:tags:array:0:,string:12:testDuration:number:26.91,string:9:timestamp:number:1751846500000,string:3:uid:string:32:AbCdEf0123456789AbCdEf0123456789,string:3:wpm:number:58,string:14:wpmConsistency:number:91.02,",
+    "hash": "ba4952a3792984a30f167ef65eb5a6a617debed5"
+  },
+  {
+    "name": "completed_event_toolong",
+    "value": {
+      "acc": 95.5,
+      "afkDuration": 2,
+      "bailedOut": false,
+      "blindMode": false,
+      "charStats": [
+        610,
+        12,
+        4,
+        6
+      ],
+      "charTotal": 626,
+      "chartData": "toolong",
+      "consistency": 80.02,
+      "difficulty": "normal",
+      "funbox": [],
+      "incompleteTestSeconds": 0,
+      "incompleteTests": [],
+      "keyConsistency": 69.99,
+      "keyDuration": "toolong",
+      "keyOverlap": 44.4,
+      "keySpacing": "toolong",
+      "language": "english",
+      "lastKeyToEnd": 310.5,
+      "lazyMode": false,
+      "mode": "words",
+      "mode2": "100",
+      "numbers": false,
+      "punctuation": false,
+      "rawWpm": 62.3,
+      "restartCount": 0,
+      "startToFirstKey": 0,
+      "stopOnLetter": false,
+      "tags": [],
+      "testDuration": 123.45,
+      "timestamp": 1751846600000,
+      "uid": "AbCdEf0123456789AbCdEf0123456789",
+      "wpm": 60.75,
+      "wpmConsistency": 85
+    },
+    "serialized": "object:36:string:9:prototype:Undefined,string:9:__proto__:object:3:string:9:prototype:Undefined,string:9:__proto__:Null,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectobject:0:,,string:11:constructor:fn:string:8:[native]string:20:function-name:Objectstring:12:[CIRCULAR:2],string:3:acc:number:95.5,string:11:afkDuration:number:2,string:9:bailedOut:bool:false,string:9:blindMode:bool:false,string:9:charStats:array:4:number:610number:12number:4number:6,string:9:charTotal:number:626,string:9:chartData:string:7:toolong,string:11:consistency:number:80.02,string:10:difficulty:string:6:normal,string:6:funbox:array:0:,string:21:incompleteTestSeconds:number:0,string:15:incompleteTests:array:0:,string:14:keyConsistency:number:69.99,string:11:keyDuration:string:7:toolong,string:10:keyOverlap:number:44.4,string:10:keySpacing:string:7:toolong,string:8:language:string:7:english,string:12:lastKeyToEnd:number:310.5,string:8:lazyMode:bool:false,string:4:mode:string:5:words,string:5:mode2:string:3:100,string:7:numbers:bool:false,string:11:punctuation:bool:false,string:6:rawWpm:number:62.3,string:12:restartCount:number:0,string:15:startToFirstKey:number:0,string:12:stopOnLetter:bool:false,string:4:tags:array:0:,string:12:testDuration:number:123.45,string:9:timestamp:number:1751846600000,string:3:uid:string:32:AbCdEf0123456789AbCdEf0123456789,string:3:wpm:number:60.75,string:14:wpmConsistency:number:85,",
+    "hash": "799a2152a3dbb94e2301547610e96d42fe6044a3"
+  }
+]
