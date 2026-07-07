@@ -36,11 +36,13 @@ fn full_words_test_produces_expected_stats() {
     session.finished_duration = Some(Duration::from_secs(30));
     let s = stats::compute(&session);
 
-    // 25 correct-word chars + 4 correct spaces -> 29 * 12 / 30 = 11.6 wpm
+    // 25 correct-word chars + 4 correct spaces -> 29 * 12 / 30 = 11.6 wpm;
+    // like the web, charStats[0] and raw include the committed correct spaces.
     assert_eq!(s.wpm, 11.6);
-    assert_eq!(s.raw, 10.0); // 25 correct chars, no errors/extras
+    assert_eq!(s.raw, 11.6);
     assert_eq!(s.acc, 100.0);
-    assert_eq!(s.char_stats, [25, 0, 0, 0]);
+    assert_eq!(s.char_stats, [29, 0, 0, 0]);
+    assert_eq!(s.char_total, 29);
     assert_eq!(s.err_per_second.iter().sum::<u32>(), 0);
     // 29 keypresses -> 28 spacing samples, all 100ms -> perfect key consistency
     assert_eq!(session.timings.key_spacing_ms.len(), 28);
