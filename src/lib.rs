@@ -3,6 +3,7 @@ pub mod auth;
 pub mod config;
 pub mod engine;
 pub mod languages;
+pub mod logging;
 pub mod storage;
 pub mod theme;
 pub mod ui;

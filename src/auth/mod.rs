@@ -81,8 +81,19 @@ impl AuthManager {
         Ok(session)
     }
 
-    pub fn login_oauth(&self, provider: OAuthProvider) -> Result<Session, AuthError> {
-        let session = oauth::login(&self.http, provider)?;
+    /// Start browser OAuth: returns (authorization URL, sessionId).
+    pub fn oauth_begin(&self, provider: OAuthProvider) -> Result<(String, String), AuthError> {
+        oauth::begin(&self.http, provider)
+    }
+
+    /// Finish browser OAuth with the redirect URL the user pasted.
+    pub fn oauth_finish(
+        &self,
+        provider: OAuthProvider,
+        pasted_url: &str,
+        session_id: &str,
+    ) -> Result<Session, AuthError> {
+        let session = oauth::finish(&self.http, provider, pasted_url, session_id)?;
         self.store.save(&session.refresh_token)?;
         Ok(session)
     }
@@ -112,14 +123,21 @@ impl AuthManager {
     /// Return a valid bearer token, refreshing in place if it is close to expiry.
     pub fn bearer(&self, session: &mut Session) -> Result<String, AuthError> {
         if session.needs_refresh() {
-            let (id_token, new_refresh, ttl) =
-                firebase::refresh_token(&self.http, &session.refresh_token)?;
-            session.id_token = id_token;
-            session.refresh_token = new_refresh.clone();
-            session.id_token_expiry = Instant::now() + Duration::from_secs(ttl);
-            let _ = self.store.save(&new_refresh);
+            self.force_refresh(session)?;
         }
         Ok(session.id_token.clone())
+    }
+
+    /// Unconditionally exchange the refresh token for a fresh id token (e.g.
+    /// after the API rejected the current one with a 401).
+    pub fn force_refresh(&self, session: &mut Session) -> Result<(), AuthError> {
+        let (id_token, new_refresh, ttl) =
+            firebase::refresh_token(&self.http, &session.refresh_token)?;
+        session.id_token = id_token;
+        session.refresh_token = new_refresh.clone();
+        session.id_token_expiry = Instant::now() + Duration::from_secs(ttl);
+        let _ = self.store.save(&new_refresh);
+        Ok(())
     }
 
     pub fn logout(&self) {

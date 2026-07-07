@@ -85,17 +85,24 @@ fn post_json(
     url: &str,
     body: &serde_json::Value,
 ) -> Result<String, AuthError> {
+    let endpoint = crate::logging::redact_url(url);
+    crate::logging::debug(format_args!("firebase POST {endpoint}"));
     let resp = client
         .post(url)
         .header("Referer", REFERER)
         .json(body)
         .send()
-        .map_err(|e| AuthError::Network(e.to_string()))?;
+        .map_err(|e| {
+            crate::logging::debug(format_args!("firebase POST {endpoint} network error: {e}"));
+            AuthError::Network(e.to_string())
+        })?;
     let status = resp.status();
     let text = resp.text().map_err(|e| AuthError::Network(e.to_string()))?;
     if status.is_success() {
+        crate::logging::debug(format_args!("firebase POST {endpoint} -> {status}"));
         Ok(text)
     } else {
+        crate::logging::debug(format_args!("firebase POST {endpoint} -> {status}: {text}"));
         Err(map_error(status.as_u16(), &text))
     }
 }
@@ -144,22 +151,28 @@ pub fn create_auth_uri(
     Ok((resp.auth_uri, resp.session_id))
 }
 
-/// Complete the OAuth handler flow: hand Firebase the full provider redirect URL
+/// Complete the OAuth handler flow: hand Firebase the provider redirect URL
 /// plus the sessionId. Firebase exchanges an auth code server-side (it holds the
 /// provider secret - this is why GitHub works without us having the secret) and
-/// returns Firebase tokens.
+/// returns Firebase tokens. Fragment credentials (Google's id_token) cannot ride
+/// in `requestUri`, so they are passed separately via `post_body`
+/// (`id_token=...&providerId=google.com`).
 pub fn sign_in_with_idp(
     client: &reqwest::blocking::Client,
     request_uri: &str,
+    post_body: Option<&str>,
     session_id: &str,
 ) -> Result<Session, AuthError> {
     let url = format!("{IDENTITY_BASE}/accounts:signInWithIdp?key={}", api_key());
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "requestUri": request_uri,
         "sessionId": session_id,
         "returnSecureToken": true,
         "returnIdpCredential": true,
     });
+    if let Some(post) = post_body {
+        body["postBody"] = serde_json::Value::String(post.to_string());
+    }
     let text = post_json(client, &url, &body)?;
     let resp: SignInResponse =
         serde_json::from_str(&text).map_err(|e| AuthError::Decode(e.to_string()))?;
@@ -178,6 +191,7 @@ pub fn refresh_token(
         expires_in: String,
     }
     let url = format!("{SECURETOKEN_BASE}/token?key={}", api_key());
+    crate::logging::debug("firebase POST token refresh");
     let resp = client
         .post(&url)
         .header("Referer", REFERER)
@@ -186,12 +200,17 @@ pub fn refresh_token(
             ("refresh_token", refresh_token),
         ])
         .send()
-        .map_err(|e| AuthError::Network(e.to_string()))?;
+        .map_err(|e| {
+            crate::logging::debug(format_args!("token refresh network error: {e}"));
+            AuthError::Network(e.to_string())
+        })?;
     let status = resp.status();
     let text = resp.text().map_err(|e| AuthError::Network(e.to_string()))?;
     if !status.is_success() {
+        crate::logging::debug(format_args!("token refresh -> {status}: {text}"));
         return Err(map_error(status.as_u16(), &text));
     }
+    crate::logging::debug(format_args!("token refresh -> {status}"));
     let r: RefreshResponse =
         serde_json::from_str(&text).map_err(|e| AuthError::Decode(e.to_string()))?;
     let ttl = r.expires_in.parse::<u64>().unwrap_or(3600);

@@ -1,151 +1,110 @@
-//! Browser-based OAuth via a localhost loopback, using Firebase's OAuth handler
-//! flow (createAuthUri -> browser -> signInWithIdp). We never need a provider
-//! client secret: for the GitHub code flow Firebase exchanges the code itself.
+//! Browser OAuth via Firebase's hosted handler page (createAuthUri ->
+//! browser -> paste redirect URL -> signInWithIdp). We never need a provider
+//! client secret: Firebase holds it and exchanges GitHub's code itself.
 //!
-//! Two provider response shapes are handled at the callback:
-//! - GitHub uses `response_type=code`, so the code arrives as a query param and
-//!   the loopback captures it directly.
-//! - Google uses `response_type=id_token`, so the credential lands in the URL
-//!   fragment; a tiny HTML+JS page copies the fragment into a second request the
-//!   loopback can read.
-
-use std::io::{BufRead, BufReader, Write};
-use std::net::{Shutdown, TcpListener, TcpStream};
-use std::time::Duration;
+//! Why no localhost loopback: monkeytype's Google and GitHub OAuth apps only
+//! register `https://auth.monkeytype.com/__/auth/handler` as a redirect URI
+//! (verified live - both providers reject a 127.0.0.1 redirect with
+//! redirect_uri_mismatch). So the browser necessarily lands on the handler
+//! page, which we cannot observe from this process. The user copies the final
+//! URL from the address bar and pastes it into the TUI instead.
+//!
+//! Provider response shapes at the handler:
+//! - GitHub uses `response_type=code`: the credential is in the query
+//!   (`?code=...&state=...`), passed to signInWithIdp as `requestUri`.
+//! - Google uses `response_type=id_token`: the credential is in the fragment
+//!   (`#id_token=...`), which signInWithIdp cannot read from a URL, so it is
+//!   converted into the `postBody` form.
 
 use super::firebase;
 use super::{AuthError, OAuthProvider, Session};
 
-/// How long to wait for the user to finish in the browser.
-const LOGIN_TIMEOUT: Duration = Duration::from_secs(180);
-
-pub fn login(
+/// Start the flow: build the provider authorization URL (redirecting to the
+/// Firebase handler) and the sessionId that `finish` needs.
+pub fn begin(
     client: &reqwest::blocking::Client,
     provider: OAuthProvider,
-) -> Result<Session, AuthError> {
-    let listener =
-        TcpListener::bind("127.0.0.1:0").map_err(|e| AuthError::Loopback(e.to_string()))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| AuthError::Loopback(e.to_string()))?
-        .port();
-    let continue_uri = format!("http://127.0.0.1:{port}/callback");
-
-    let (auth_uri, session_id) =
-        firebase::create_auth_uri(client, provider.provider_id(), &continue_uri)?;
-
-    // Best-effort browser launch; the URL is also surfaced for copy-paste.
-    let _ = open::that(&auth_uri);
-
-    let request_uri = wait_for_redirect(&listener, port)?;
-    firebase::sign_in_with_idp(client, &request_uri, &session_id)
-}
-
-/// The authorization URL for the given provider (also shown in the TUI so the
-/// user can paste it into a browser on a headless/remote machine).
-pub fn auth_url(
-    client: &reqwest::blocking::Client,
-    provider: OAuthProvider,
-    port: u16,
 ) -> Result<(String, String), AuthError> {
-    let continue_uri = format!("http://127.0.0.1:{port}/callback");
+    let continue_uri = format!("https://{}/__/auth/handler", firebase::AUTH_DOMAIN);
     firebase::create_auth_uri(client, provider.provider_id(), &continue_uri)
 }
 
-/// Block until the browser hits our loopback, returning the full redirect URL
-/// (with code/token) to hand to signInWithIdp.
-fn wait_for_redirect(listener: &TcpListener, port: u16) -> Result<String, AuthError> {
-    listener
-        .set_nonblocking(false)
-        .map_err(|e| AuthError::Loopback(e.to_string()))?;
-    let deadline = std::time::Instant::now() + LOGIN_TIMEOUT;
+/// Complete the flow with the URL the user copied from the browser address bar
+/// after signing in at the provider.
+pub fn finish(
+    client: &reqwest::blocking::Client,
+    provider: OAuthProvider,
+    pasted_url: &str,
+    session_id: &str,
+) -> Result<Session, AuthError> {
+    let url = pasted_url.trim();
+    if url.is_empty() {
+        return Err(AuthError::Loopback("no redirect URL pasted".into()));
+    }
+    if let Some(denial) = denial_message(url) {
+        return Err(AuthError::Loopback(denial));
+    }
 
-    // Accept connections until one carries the credential. The fragment case
-    // (Google) needs two hits: first the JS page, then the copied fragment.
-    loop {
-        if std::time::Instant::now() > deadline {
-            return Err(AuthError::Loopback("timed out waiting for browser".into()));
+    // Fragment credentials (Google id_token flow) must travel via postBody;
+    // query credentials (GitHub code flow) go through requestUri untouched.
+    if let Some(fragment) = url.split('#').nth(1) {
+        if fragment.contains("id_token=") || fragment.contains("access_token=") {
+            let post_body = format!("{fragment}&providerId={}", provider.provider_id());
+            let base = url.split('#').next().unwrap_or(url);
+            return firebase::sign_in_with_idp(client, base, Some(&post_body), session_id);
         }
-        listener
-            .set_nonblocking(true)
-            .map_err(|e| AuthError::Loopback(e.to_string()))?;
-        match listener.accept() {
-            Ok((stream, _)) => {
-                if let Some(uri) = handle_connection(stream, port)? {
-                    return Ok(uri);
+    }
+    firebase::sign_in_with_idp(client, url, None, session_id)
+}
+
+/// If the provider redirected back with an OAuth error, return its actual
+/// message instead of a generic "denied".
+fn denial_message(url: &str) -> Option<String> {
+    let params = url
+        .split_once(['?', '#'])
+        .map(|(_, rest)| rest)?
+        .split(['&', '#']);
+    let mut error = None;
+    let mut description = None;
+    for param in params {
+        if let Some(v) = param.strip_prefix("error=") {
+            // "error_description=" and "error_uri=" must not match "error="
+            error = Some(v);
+        } else if let Some(v) = param.strip_prefix("error_description=") {
+            description = Some(v);
+        }
+    }
+    let error = error?;
+    let text = match description {
+        Some(desc) => format!("{error}: {}", percent_decode(desc)),
+        None => percent_decode(error),
+    };
+    Some(format!("provider returned an error - {text}"))
+}
+
+/// Minimal percent-decoding for OAuth error descriptions ('+' as space).
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => out.push(b' '),
+            b'%' if i + 2 < bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or("");
+                if let Ok(byte) = u8::from_str_radix(hex, 16) {
+                    out.push(byte);
+                    i += 3;
+                    continue;
                 }
+                out.push(b'%');
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(50));
-            }
-            Err(e) => return Err(AuthError::Loopback(e.to_string())),
+            b => out.push(b),
         }
+        i += 1;
     }
+    String::from_utf8_lossy(&out).into_owned()
 }
-
-/// Parse one HTTP request line. Returns Some(full_callback_url) once we have the
-/// credential, or None if this was an intermediate request (favicon, the JS
-/// bootstrap page for the fragment flow, etc.).
-fn handle_connection(mut stream: TcpStream, port: u16) -> Result<Option<String>, AuthError> {
-    stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
-    let mut reader = BufReader::new(
-        stream
-            .try_clone()
-            .map_err(|e| AuthError::Loopback(e.to_string()))?,
-    );
-    let mut request_line = String::new();
-    reader
-        .read_line(&mut request_line)
-        .map_err(|e| AuthError::Loopback(e.to_string()))?;
-
-    // "GET /callback?code=...&state=... HTTP/1.1"
-    let path = request_line.split_whitespace().nth(1).unwrap_or("/");
-
-    // The fragment-relay page posts back to /token?<fragment>.
-    if let Some(query) = path.strip_prefix("/token?") {
-        respond(&mut stream, DONE_PAGE);
-        let full = format!("http://127.0.0.1:{port}/callback?{query}");
-        return Ok(Some(full));
-    }
-
-    if let Some(rest) = path.strip_prefix("/callback") {
-        // Query present -> code flow (GitHub): capture directly.
-        if let Some(query) = rest.strip_prefix('?') {
-            if query.contains("error") {
-                respond(&mut stream, DONE_PAGE);
-                return Err(AuthError::Loopback("authorization was denied".into()));
-            }
-            respond(&mut stream, DONE_PAGE);
-            let full = format!("http://127.0.0.1:{port}/callback?{query}");
-            return Ok(Some(full));
-        }
-        // No query -> the credential is in the fragment (Google id_token flow).
-        // Serve JS that relays the fragment back to /token.
-        respond(&mut stream, FRAGMENT_RELAY_PAGE);
-        return Ok(None);
-    }
-
-    // Anything else (e.g. /favicon.ico): ignore.
-    respond(&mut stream, DONE_PAGE);
-    Ok(None)
-}
-
-fn respond(stream: &mut TcpStream, body: &str) {
-    let response = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        body.len(),
-        body
-    );
-    let _ = stream.write_all(response.as_bytes());
-    let _ = stream.flush();
-    let _ = stream.shutdown(Shutdown::Write);
-}
-
-const DONE_PAGE: &str = "<!doctype html><html><body style=\"font-family:sans-serif;background:#323437;color:#d1d0c5;text-align:center;padding-top:4rem\"><h2>monkeytype-tui</h2><p>Login complete. You can close this tab and return to the terminal.</p></body></html>";
-
-// Copies the URL fragment (#id_token=...) into a request the loopback can read,
-// since fragments are never sent to the server directly.
-const FRAGMENT_RELAY_PAGE: &str = "<!doctype html><html><body style=\"font-family:sans-serif;background:#323437;color:#d1d0c5;text-align:center;padding-top:4rem\"><h2>monkeytype-tui</h2><p>Finishing login...</p><script>var f=window.location.hash.substring(1);window.location.replace('/token?'+f);</script></body></html>";
 
 impl OAuthProvider {
     pub fn provider_id(self) -> &'static str {
@@ -153,5 +112,42 @@ impl OAuthProvider {
             OAuthProvider::Google => "google.com",
             OAuthProvider::Github => "github.com",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn denial_extracts_provider_error() {
+        let url = "https://auth.monkeytype.com/__/auth/handler?error=access_denied&error_description=The+user+has+denied+access&state=x";
+        let msg = denial_message(url).expect("detects error param");
+        assert!(msg.contains("access_denied"), "{msg}");
+        assert!(msg.contains("The user has denied access"), "{msg}");
+    }
+
+    #[test]
+    fn denial_ignores_success_redirects() {
+        assert_eq!(
+            denial_message("https://auth.monkeytype.com/__/auth/handler?code=abc&state=x"),
+            None
+        );
+        assert_eq!(
+            denial_message("https://auth.monkeytype.com/__/auth/handler#id_token=abc"),
+            None
+        );
+        // error_description alone (no error=) is not a denial marker
+        assert_eq!(
+            denial_message("https://x.test/cb?error_description=only"),
+            None
+        );
+    }
+
+    #[test]
+    fn percent_decode_handles_escapes() {
+        assert_eq!(percent_decode("a%20b+c%2Fd"), "a b c/d");
+        assert_eq!(percent_decode("plain"), "plain");
+        assert_eq!(percent_decode("bad%zz"), "bad%zz");
     }
 }
