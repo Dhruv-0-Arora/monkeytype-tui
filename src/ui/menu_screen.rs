@@ -91,7 +91,8 @@ impl Default for MenuState {
 
 pub fn draw(frame: &mut Frame, app: &App, state: &MenuState) {
     let theme = &app.theme;
-    let area = centered(frame.area(), 44, state.items.len() as u16 + 4);
+    let notice_rows = if app.auth_notice.is_some() { 2 } else { 0 };
+    let area = centered(frame.area(), 44, state.items.len() as u16 + 4 + notice_rows);
     let account_line = match &app.account {
         Some(session) => {
             let who = session
@@ -116,6 +117,16 @@ pub fn draw(frame: &mut Frame, app: &App, state: &MenuState) {
         .centered(),
         Line::default(),
     ];
+    if let Some(notice) = &app.auth_notice {
+        lines.push(
+            Line::from(Span::styled(
+                notice.clone(),
+                Style::default().fg(theme.error.color()),
+            ))
+            .centered(),
+        );
+        lines.push(Line::default());
+    }
     for (i, item) in state.items.iter().enumerate() {
         let selected = i == state.selected;
         let marker = if selected { "> " } else { "  " };

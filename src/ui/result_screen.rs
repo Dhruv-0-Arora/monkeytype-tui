@@ -4,7 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Sparkline};
 use ratatui::Frame;
 
-use crate::app::App;
+use crate::app::{App, SubmissionStatus};
 use crate::engine::stats::FinalStats;
 use crate::ui::{centered, format_speed};
 
@@ -12,14 +12,15 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
     let theme = &app.theme;
     let config = &app.config;
     let unit = config.typing_speed_unit.as_str();
-    let area = centered(frame.area(), 64, 12);
-    let [wpm_row, acc_row, chars_row, _, chart_area, _, hint_row] = Layout::vertical([
+    let area = centered(frame.area(), 64, 14);
+    let [wpm_row, acc_row, chars_row, _, chart_area, _, save_row, hint_row] = Layout::vertical([
         Constraint::Length(2),
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(4),
         Constraint::Length(1),
+        Constraint::Length(2),
         Constraint::Length(1),
     ])
     .areas(area);
@@ -72,7 +73,11 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
         chars_row,
     );
 
-    let burst: Vec<u64> = stats.raw_per_second.iter().map(|&v| v as u64).collect();
+    let burst: Vec<u64> = stats
+        .burst_per_second
+        .iter()
+        .map(|&v| u64::from(v))
+        .collect();
     if !burst.is_empty() {
         frame.render_widget(
             Sparkline::default()
@@ -80,6 +85,52 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
                 .style(Style::default().fg(theme.main.color())),
             chart_area,
         );
+    }
+
+    let save_line = match &app.submission {
+        SubmissionStatus::Idle => None,
+        SubmissionStatus::Skipped(reason) => Some(Line::from(Span::styled(
+            reason.clone(),
+            Style::default().fg(theme.sub.color()),
+        ))),
+        SubmissionStatus::InFlight => Some(Line::from(Span::styled(
+            "saving...",
+            Style::default().fg(theme.sub.color()),
+        ))),
+        SubmissionStatus::Saved(data) => {
+            let mut spans = vec![Span::styled(
+                "saved ✓",
+                Style::default().fg(theme.main.color()),
+            )];
+            if data.is_pb {
+                spans.push(Span::styled(
+                    "  new pb!",
+                    Style::default().fg(theme.main.color()),
+                ));
+            }
+            let mut extras = format!("  +{}xp", data.xp);
+            if data.streak > 1 {
+                extras.push_str(&format!("  streak {}", data.streak));
+            }
+            spans.push(Span::styled(extras, Style::default().fg(theme.sub.color())));
+            Some(Line::from(spans))
+        }
+        SubmissionStatus::Failed { message, retryable } => {
+            let mut spans = vec![Span::styled(
+                format!("not saved: {message}"),
+                Style::default().fg(theme.error.color()),
+            )];
+            if *retryable {
+                spans.push(Span::styled(
+                    "  (r to retry)",
+                    Style::default().fg(theme.sub.color()),
+                ));
+            }
+            Some(Line::from(spans))
+        }
+    };
+    if let Some(line) = save_line {
+        frame.render_widget(Paragraph::new(line.centered()), save_row);
     }
 
     if config.show_key_tips {
