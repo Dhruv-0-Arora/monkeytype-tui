@@ -1,4 +1,5 @@
 pub mod keymap;
+pub mod login_screen;
 pub mod menu_screen;
 pub mod result_screen;
 pub mod settings_screen;

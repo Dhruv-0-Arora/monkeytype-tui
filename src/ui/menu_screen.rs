@@ -7,19 +7,57 @@ use ratatui::Frame;
 use crate::app::{Action, App};
 use crate::ui::centered;
 
-const ITEMS: &[(&str, &str)] = &[
-    ("resume", "back to the test"),
-    ("settings", "all config options"),
-    ("themes", "pick or edit themes"),
-    ("quit", "exit monkeytype-tui"),
-];
+struct Item {
+    id: &'static str,
+    label: &'static str,
+    hint: &'static str,
+}
 
-#[derive(Default)]
 pub struct MenuState {
+    items: Vec<Item>,
     pub selected: usize,
 }
 
 impl MenuState {
+    pub fn new(logged_in: bool) -> Self {
+        let mut items = vec![
+            Item {
+                id: "resume",
+                label: "resume",
+                hint: "back to the test",
+            },
+            Item {
+                id: "settings",
+                label: "settings",
+                hint: "all config options",
+            },
+            Item {
+                id: "themes",
+                label: "themes",
+                hint: "pick or edit themes",
+            },
+        ];
+        if logged_in {
+            items.push(Item {
+                id: "logout",
+                label: "log out",
+                hint: "sign out of your account",
+            });
+        } else {
+            items.push(Item {
+                id: "login",
+                label: "log in",
+                hint: "sign in to save results",
+            });
+        }
+        items.push(Item {
+            id: "quit",
+            label: "quit",
+            hint: "exit monkeytype-tui",
+        });
+        Self { items, selected: 0 }
+    }
+
     pub fn handle(&mut self, code: KeyCode) -> Action {
         match code {
             KeyCode::Up | KeyCode::Char('k') => {
@@ -27,14 +65,16 @@ impl MenuState {
                 Action::None
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                self.selected = (self.selected + 1).min(ITEMS.len() - 1);
+                self.selected = (self.selected + 1).min(self.items.len() - 1);
                 Action::None
             }
             KeyCode::Esc => Action::CloseToTest,
-            KeyCode::Enter => match ITEMS[self.selected].0 {
+            KeyCode::Enter => match self.items[self.selected].id {
                 "resume" => Action::CloseToTest,
                 "settings" => Action::OpenSettings,
                 "themes" => Action::OpenThemes,
+                "login" => Action::OpenLogin,
+                "logout" => Action::Logout,
                 _ => Action::Quit,
             },
             KeyCode::Char('q') => Action::Quit,
@@ -43,16 +83,40 @@ impl MenuState {
     }
 }
 
+impl Default for MenuState {
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
+
 pub fn draw(frame: &mut Frame, app: &App, state: &MenuState) {
     let theme = &app.theme;
-    let area = centered(frame.area(), 40, ITEMS.len() as u16 + 2);
-    let mut lines: Vec<Line> = vec![Line::from(Span::styled(
-        "monkeytype-tui",
-        Style::default().fg(theme.main.color()),
-    ))
-    .centered()];
-    lines.push(Line::default());
-    for (i, (name, hint)) in ITEMS.iter().enumerate() {
+    let area = centered(frame.area(), 44, state.items.len() as u16 + 4);
+    let account_line = match &app.account {
+        Some(session) => {
+            let who = session
+                .email
+                .clone()
+                .unwrap_or_else(|| session.uid.chars().take(8).collect());
+            format!("signed in as {who}")
+        }
+        None => "not signed in".to_string(),
+    };
+
+    let mut lines: Vec<Line> = vec![
+        Line::from(Span::styled(
+            "monkeytype-tui",
+            Style::default().fg(theme.main.color()),
+        ))
+        .centered(),
+        Line::from(Span::styled(
+            account_line,
+            Style::default().fg(theme.sub.color()),
+        ))
+        .centered(),
+        Line::default(),
+    ];
+    for (i, item) in state.items.iter().enumerate() {
         let selected = i == state.selected;
         let marker = if selected { "> " } else { "  " };
         let name_style = if selected {
@@ -61,8 +125,8 @@ pub fn draw(frame: &mut Frame, app: &App, state: &MenuState) {
             Style::default().fg(theme.text.color())
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("{marker}{name:<10}"), name_style),
-            Span::styled(*hint, Style::default().fg(theme.sub.color())),
+            Span::styled(format!("{marker}{:<10}", item.label), name_style),
+            Span::styled(item.hint, Style::default().fg(theme.sub.color())),
         ]));
     }
     frame.render_widget(Paragraph::new(lines), area);

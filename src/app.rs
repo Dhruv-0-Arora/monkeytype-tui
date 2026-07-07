@@ -1,15 +1,18 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
 
+use crate::auth::worker::{AuthEvent, AuthRequest, AuthWorker};
+use crate::auth::{AuthManager, Session, TokenStore};
 use crate::config::{Config, Mode};
 use crate::engine::stats::FinalStats;
 use crate::engine::{SessionState, TestMode, TestSession};
 use crate::languages::{self, LanguageData};
 use crate::storage::Paths;
 use crate::theme::{self, Theme};
-use crate::ui;
+use crate::ui::{self, login_screen::LoginAction};
 
 const TICK: Duration = Duration::from_millis(33);
 
@@ -21,6 +24,7 @@ pub enum Screen {
     Menu(ui::menu_screen::MenuState),
     Settings(ui::settings_screen::SettingsState),
     Themes(ui::theme_screen::ThemeState),
+    Login(ui::login_screen::LoginState),
 }
 
 /// What a screen asks the app to do after handling a key.
@@ -31,6 +35,8 @@ pub enum Action {
     OpenMenu,
     OpenSettings,
     OpenThemes,
+    OpenLogin,
+    Logout,
     CloseToTest,
     ConfigChanged,
     ThemesChanged,
@@ -44,9 +50,12 @@ pub struct App {
     pub themes: Vec<(String, Theme)>,
     pub language: LanguageData,
     pub key_release_supported: bool,
-    /// Last pressed key + when, for the keymap "react" mode.
     pub last_key: Option<(char, Instant)>,
     pub paths: Option<Paths>,
+    /// Logged-in user, if any.
+    pub account: Option<Session>,
+    auth: Arc<AuthManager>,
+    auth_worker: AuthWorker,
     should_quit: bool,
 }
 
@@ -60,7 +69,6 @@ impl App {
         if let Some(paths) = &paths {
             let _ = paths.ensure_dirs();
         }
-        // CLI flags override the loaded config for this run.
         match cli_mode {
             Some(TestMode::Time(t)) => {
                 config.mode = Mode::Time;
@@ -81,6 +89,15 @@ impl App {
         let language = languages::english();
         let session = new_session(&config, &language, key_release_supported);
 
+        let tokens_file = paths
+            .as_ref()
+            .map(|p| p.tokens_file.clone())
+            .unwrap_or_else(|| std::path::PathBuf::from("tokens.json"));
+        let auth = Arc::new(AuthManager::new(TokenStore::new(tokens_file)));
+        let mut auth_worker = AuthWorker::spawn(auth.clone());
+        // Restore a prior session off-thread so startup never blocks on network.
+        auth_worker.submit(AuthRequest::Restore);
+
         Self {
             screen: Screen::Test,
             session,
@@ -91,6 +108,9 @@ impl App {
             key_release_supported,
             last_key: None,
             paths,
+            account: None,
+            auth,
+            auth_worker,
             should_quit: false,
         }
     }
@@ -116,6 +136,7 @@ impl App {
             Screen::Menu(state) => ui::menu_screen::draw(frame, self, state),
             Screen::Settings(state) => ui::settings_screen::draw(frame, self, state),
             Screen::Themes(state) => ui::theme_screen::draw(frame, self, state),
+            Screen::Login(state) => ui::login_screen::draw(frame, self, state),
         }
     }
 
@@ -132,6 +153,22 @@ impl App {
         }
         if let KeyCode::Char(c) = key.code {
             self.last_key = Some((c, now));
+        }
+
+        // Login screen dispatches auth requests through the app.
+        if let Screen::Login(state) = &mut self.screen {
+            match state.handle(key.code, key.modifiers) {
+                LoginAction::None => {}
+                LoginAction::Back => self.apply(Action::OpenMenu),
+                LoginAction::SubmitEmail { email, password } => {
+                    self.auth_worker
+                        .submit(AuthRequest::Email { email, password });
+                }
+                LoginAction::SubmitOAuth(provider) => {
+                    self.auth_worker.submit(AuthRequest::OAuth(provider));
+                }
+            }
+            return;
         }
 
         let action = match &mut self.screen {
@@ -156,6 +193,7 @@ impl App {
                 &self.themes,
                 self.paths.as_ref(),
             ),
+            Screen::Login(_) => Action::None, // handled above
         };
         self.apply(action);
     }
@@ -165,12 +203,22 @@ impl App {
             Action::None => {}
             Action::Quit => self.should_quit = true,
             Action::Restart => self.restart(),
-            Action::OpenMenu => self.screen = Screen::Menu(ui::menu_screen::MenuState::default()),
+            Action::OpenMenu => {
+                self.screen = Screen::Menu(ui::menu_screen::MenuState::new(self.account.is_some()));
+            }
             Action::OpenSettings => {
                 self.screen = Screen::Settings(ui::settings_screen::SettingsState::new());
             }
             Action::OpenThemes => {
                 self.screen = Screen::Themes(ui::theme_screen::ThemeState::new(&self.themes));
+            }
+            Action::OpenLogin => {
+                self.screen = Screen::Login(ui::login_screen::LoginState::new());
+            }
+            Action::Logout => {
+                self.auth.logout();
+                self.account = None;
+                self.screen = Screen::Menu(ui::menu_screen::MenuState::new(false));
             }
             Action::CloseToTest => {
                 self.save_config();
@@ -191,6 +239,26 @@ impl App {
     }
 
     fn on_tick(&mut self) {
+        // Drain completed auth operations.
+        if let Some(event) = self.auth_worker.poll() {
+            match event {
+                AuthEvent::LoggedIn(session) => {
+                    self.account = Some(session);
+                    // Interactive login closes the login screen; a background
+                    // restore just updates state without disturbing the test.
+                    if matches!(self.screen, Screen::Login(_)) {
+                        self.restart();
+                    }
+                }
+                AuthEvent::NotRestored => {}
+                AuthEvent::Failed(msg) => {
+                    if let Screen::Login(state) = &mut self.screen {
+                        state.set_error(msg);
+                    }
+                }
+            }
+        }
+
         if matches!(self.screen, Screen::Test) {
             self.session.tick();
             self.check_finished();
@@ -205,7 +273,6 @@ impl App {
     }
 
     fn restart(&mut self) {
-        // randomTheme picks a new theme every test, like the web.
         if let Some(name) = theme::pick_random(&self.config, &self.themes) {
             self.config.theme = name;
             self.theme = theme::resolve(&self.config, &self.themes);
@@ -224,8 +291,6 @@ impl App {
 fn new_session(config: &Config, language: &LanguageData, release_events: bool) -> TestSession {
     let mode = match config.mode {
         Mode::Words => TestMode::Words(config.words.max(1)),
-        // quote/zen/custom are architecture slots; they run as time mode
-        // until implemented (settings screen labels them accordingly).
         Mode::Time | Mode::Quote | Mode::Zen | Mode::Custom => TestMode::Time(config.time.max(1)),
     };
     let mut session = TestSession::new(mode, language, release_events);
