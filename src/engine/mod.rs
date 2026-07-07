@@ -1,3 +1,4 @@
+pub mod completed_event;
 pub mod input;
 pub mod stats;
 pub mod timing;
@@ -39,6 +40,11 @@ pub struct TestSession {
     pub state: SessionState,
     pub timings: KeystrokeTimings,
     pub keystrokes: Vec<Keystroke>,
+    /// Cumulative correct-word chars (committed correct words with their
+    /// spaces, plus the correct prefix of the active word) sampled after every
+    /// mutating input - deletions included, like the web's wpm history which
+    /// recounts from scratch at each timer boundary. Drives chartData.wpm.
+    pub progress_samples: Vec<(Duration, u32)>,
     pub started_at: Option<Instant>,
     pub finished_duration: Option<Duration>,
     /// config.quickEnd: end the test at full length of the last word even if
@@ -67,6 +73,7 @@ impl TestSession {
             state: SessionState::NotStarted,
             timings: KeystrokeTimings::new(release_events_available),
             keystrokes: Vec::new(),
+            progress_samples: Vec::new(),
             started_at: None,
             finished_duration: None,
             quick_end: false,
@@ -132,5 +139,37 @@ impl TestSession {
 
     pub fn word_is_correct(&self, idx: usize) -> bool {
         self.typed[idx] == self.target[idx]
+    }
+
+    /// Correct-word chars right now: every committed correct word counts its
+    /// full length plus the committed space; the active word counts its
+    /// correct prefix (the web's live wpm counts the partial word).
+    pub fn correct_word_chars_snapshot(&self) -> u32 {
+        let mut total = 0u32;
+        for idx in 0..=self.current.min(self.target.len().saturating_sub(1)) {
+            let target = &self.target[idx];
+            let typed = &self.typed[idx];
+            if idx < self.current {
+                if !typed.is_empty() && typed == target {
+                    total += target.chars().count() as u32 + 1; // word + space
+                }
+            } else {
+                total += target
+                    .chars()
+                    .zip(typed.chars())
+                    .take_while(|(t, c)| t == c)
+                    .count() as u32;
+            }
+        }
+        total
+    }
+
+    /// Record a progress sample after a mutating input (see progress_samples).
+    pub(crate) fn sample_progress(&mut self, now: Instant) {
+        if let Some(started) = self.started_at {
+            let at = now.duration_since(started);
+            let chars = self.correct_word_chars_snapshot();
+            self.progress_samples.push((at, chars));
+        }
     }
 }

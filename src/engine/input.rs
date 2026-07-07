@@ -22,7 +22,7 @@ impl TestSession {
         match code {
             KeyCode::Char(' ') => self.handle_space(now),
             KeyCode::Char(c) => self.handle_char(c, now),
-            KeyCode::Backspace => self.handle_backspace(),
+            KeyCode::Backspace => self.handle_backspace(now),
             _ => InputOutcome::Ignored,
         }
     }
@@ -59,6 +59,7 @@ impl TestSession {
         let correct = target.get(pos) == Some(&c);
         self.typed[self.current].push(c);
         self.record(KeyCode::Char(c), correct, now);
+        self.sample_progress(now);
 
         // A correctly completed final word always ends the test; with
         // quickEnd it also ends at full length even if the word has errors.
@@ -83,27 +84,31 @@ impl TestSession {
         self.record(KeyCode::Char(' '), correct, now);
 
         if self.is_last_word() {
+            self.sample_progress(now);
             let elapsed = self.elapsed();
             self.finish(elapsed);
             return InputOutcome::Finished;
         }
         self.current += 1;
         self.extend_if_needed();
+        self.sample_progress(now);
         InputOutcome::Accepted
     }
 
-    fn handle_backspace(&mut self) -> InputOutcome {
+    fn handle_backspace(&mut self, now: Instant) -> InputOutcome {
         if self.state != SessionState::Running {
             return InputOutcome::Ignored;
         }
         if !self.typed[self.current].is_empty() {
             self.typed[self.current].pop();
+            self.sample_progress(now);
             return InputOutcome::Accepted;
         }
         // Move back to the previous word only if it was left incorrect,
         // matching the web's default (freedomMode changes this in Phase 2).
         if self.current > 0 && !self.word_is_correct(self.current - 1) {
             self.current -= 1;
+            self.sample_progress(now);
             return InputOutcome::Accepted;
         }
         InputOutcome::Ignored
