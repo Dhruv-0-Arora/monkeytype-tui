@@ -60,12 +60,16 @@ impl TestSession {
         self.typed[self.current].push(c);
         self.record(KeyCode::Char(c), correct, now);
 
-        // In words mode, correctly completing the final word ends the test
-        // without needing a trailing space (the web's quickEnd behavior).
-        if self.is_last_word() && self.word_is_correct(self.current) {
-            let elapsed = self.elapsed();
-            self.finish(elapsed);
-            return InputOutcome::Finished;
+        // A correctly completed final word always ends the test; with
+        // quickEnd it also ends at full length even if the word has errors.
+        if self.is_last_word() {
+            let full_length = self.typed[self.current].chars().count()
+                >= self.target[self.current].chars().count();
+            if self.word_is_correct(self.current) || (self.quick_end && full_length) {
+                let elapsed = self.elapsed();
+                self.finish(elapsed);
+                return InputOutcome::Finished;
+            }
         }
         InputOutcome::Accepted
     }

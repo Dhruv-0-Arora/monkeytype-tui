@@ -6,10 +6,12 @@ use ratatui::Frame;
 
 use crate::app::App;
 use crate::engine::stats::FinalStats;
-use crate::ui::centered;
+use crate::ui::{centered, format_speed};
 
 pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
     let theme = &app.theme;
+    let config = &app.config;
+    let unit = config.typing_speed_unit.as_str();
     let area = centered(frame.area(), 64, 12);
     let [wpm_row, acc_row, chars_row, _, chart_area, _, hint_row] = Layout::vertical([
         Constraint::Length(2),
@@ -24,15 +26,18 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
 
     let big = |label: &str, value: String| -> Line {
         Line::from(vec![
-            Span::styled(format!("{label:>4} "), Style::default().fg(theme.sub)),
-            Span::styled(value, Style::default().fg(theme.main)),
+            Span::styled(
+                format!("{label:>4} "),
+                Style::default().fg(theme.sub.color()),
+            ),
+            Span::styled(value, Style::default().fg(theme.main.color())),
         ])
     };
 
     frame.render_widget(
         Paragraph::new(vec![
-            big("wpm", format!("{:.2}", stats.wpm)),
-            big("raw", format!("{:.2}", stats.raw)),
+            big(unit, format_speed(stats.wpm, config)),
+            big("raw", format_speed(stats.raw, config)),
         ]),
         wpm_row,
     );
@@ -50,10 +55,10 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
     let [correct, incorrect, extra, missed] = stats.char_stats;
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("chars ", Style::default().fg(theme.sub)),
+            Span::styled("chars ", Style::default().fg(theme.sub.color())),
             Span::styled(
                 format!("{correct}/{incorrect}/{extra}/{missed}"),
-                Style::default().fg(theme.text),
+                Style::default().fg(theme.text.color()),
             ),
             Span::styled(
                 format!(
@@ -61,7 +66,7 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
                     stats.err_per_second.iter().sum::<u32>(),
                     stats.duration_s
                 ),
-                Style::default().fg(theme.sub),
+                Style::default().fg(theme.sub.color()),
             ),
         ])),
         chars_row,
@@ -72,15 +77,17 @@ pub fn draw(frame: &mut Frame, app: &App, stats: &FinalStats) {
         frame.render_widget(
             Sparkline::default()
                 .data(&burst)
-                .style(Style::default().fg(theme.main)),
+                .style(Style::default().fg(theme.main.color())),
             chart_area,
         );
     }
 
-    let hint = Line::from(Span::styled(
-        "tab/enter next test · esc quit",
-        Style::default().fg(theme.sub),
-    ))
-    .centered();
-    frame.render_widget(Paragraph::new(hint), hint_row);
+    if config.show_key_tips {
+        let hint = Line::from(Span::styled(
+            "tab/enter next test · esc menu",
+            Style::default().fg(theme.sub.color()),
+        ))
+        .centered();
+        frame.render_widget(Paragraph::new(hint), hint_row);
+    }
 }

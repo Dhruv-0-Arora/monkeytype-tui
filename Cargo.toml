@@ -2,7 +2,7 @@
 name = "monkeytype-tui"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.82"
 description = "A terminal client for monkeytype"
 license = "GPL-3.0-or-later"
 
@@ -11,6 +11,8 @@ ratatui = "0.29"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rand = { version = "0.8", features = ["small_rng"] }
+toml = "0.8"
+directories = "5"
 
 [dev-dependencies]
 pretty_assertions = "1"

@@ -24,6 +24,19 @@ pub fn round_to2(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
 
+/// Convert a wpm value into the configured display unit (web's typing-speed
+/// unit multipliers: cpm x5, wps /60, cps x5/60, wph x60).
+pub fn convert_speed(wpm: f64, unit: crate::config::TypingSpeedUnit) -> f64 {
+    use crate::config::TypingSpeedUnit as U;
+    match unit {
+        U::Wpm => wpm,
+        U::Cpm => wpm * 5.0,
+        U::Wps => wpm / 60.0,
+        U::Cps => wpm * 5.0 / 60.0,
+        U::Wph => wpm * 60.0,
+    }
+}
+
 pub fn mean(xs: &[f64]) -> f64 {
     if xs.is_empty() {
         return 0.0;
@@ -92,6 +105,9 @@ pub fn compute(session: &TestSession) -> FinalStats {
         .iter()
         .rposition(|t| !t.is_empty())
         .map_or(0, |i| i + 1);
+    // The web counts the partially-typed last word's correct prefix toward
+    // correctWord in timed tests (countPartial in getChars).
+    let count_partial = matches!(session.mode, super::TestMode::Time(_));
     for idx in 0..touched {
         let target: Vec<char> = session.target[idx].chars().collect();
         let typed: Vec<char> = session.typed[idx].chars().collect();
@@ -114,6 +130,13 @@ pub fn compute(session: &TestSession) -> FinalStats {
             if idx + 1 < touched || idx < session.current {
                 correct_spaces += 1;
             }
+        } else if idx + 1 == touched && count_partial {
+            // correct prefix of the in-progress final word
+            correct_word_chars += target
+                .iter()
+                .zip(typed.iter())
+                .take_while(|(t, c)| t == c)
+                .count() as u32;
         }
     }
 
@@ -132,9 +155,10 @@ pub fn compute(session: &TestSession) -> FinalStats {
             err_per_second[bucket] += 1;
         }
     }
+    // Web burst history is Math.round()ed per second (getBurstHistory).
     let raw_per_second: Vec<f64> = chars_per_second
         .iter()
-        .map(|&c| f64::from(c) * 12.0)
+        .map(|&c| (f64::from(c) * 12.0).round())
         .collect();
 
     let spacing = &session.timings.key_spacing_ms;

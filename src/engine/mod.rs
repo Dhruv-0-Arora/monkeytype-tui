@@ -41,6 +41,9 @@ pub struct TestSession {
     pub keystrokes: Vec<Keystroke>,
     pub started_at: Option<Instant>,
     pub finished_duration: Option<Duration>,
+    /// config.quickEnd: end the test at full length of the last word even if
+    /// it has errors (a correct last word always ends the test, like the web).
+    pub quick_end: bool,
     generator: WordGenerator,
 }
 
@@ -66,6 +69,7 @@ impl TestSession {
             keystrokes: Vec::new(),
             started_at: None,
             finished_duration: None,
+            quick_end: false,
             generator,
         }
     }

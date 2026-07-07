@@ -11,12 +11,12 @@ fn value_of<T: std::str::FromStr>(args: &[String], flag: &str) -> Option<T> {
         .and_then(|v| v.parse().ok())
 }
 
-fn parse_mode() -> engine::TestMode {
+fn parse_mode() -> Option<engine::TestMode> {
     let args: Vec<String> = std::env::args().collect();
     if let Some(n) = value_of::<usize>(&args, "--words") {
-        engine::TestMode::Words(n)
+        Some(engine::TestMode::Words(n))
     } else {
-        engine::TestMode::Time(value_of::<u64>(&args, "--time").unwrap_or(30))
+        value_of::<u64>(&args, "--time").map(engine::TestMode::Time)
     }
 }
 
