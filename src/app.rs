@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame};
 
+use crate::api::worker::{ApiEvent, ApiRequest, ApiWorker};
+use crate::api::{ApeClient, PostResultData};
 use crate::auth::worker::{AuthEvent, AuthRequest, AuthWorker};
 use crate::auth::{AuthManager, Session, TokenStore};
 use crate::config::{Config, Mode};
@@ -25,6 +27,19 @@ pub enum Screen {
     Settings(ui::settings_screen::SettingsState),
     Themes(ui::theme_screen::ThemeState),
     Login(ui::login_screen::LoginState),
+}
+
+/// Where the just-finished test's submission stands (shown on the result screen).
+pub enum SubmissionStatus {
+    Idle,
+    /// Not submitted, with the reason (logged out, saving off, would be rejected).
+    Skipped(String),
+    InFlight,
+    Saved(PostResultData),
+    Failed {
+        message: String,
+        retryable: bool,
+    },
 }
 
 /// What a screen asks the app to do after handling a key.
@@ -54,8 +69,14 @@ pub struct App {
     pub paths: Option<Paths>,
     /// Logged-in user, if any.
     pub account: Option<Session>,
+    /// Outcome of an auth attempt that finished while off the login screen.
+    pub auth_notice: Option<String>,
+    pub submission: SubmissionStatus,
+    /// The last built CompletedEvent, kept for retry on transient failures.
+    last_event: Option<serde_json::Value>,
     auth: Arc<AuthManager>,
     auth_worker: AuthWorker,
+    api_worker: ApiWorker,
     should_quit: bool,
 }
 
@@ -69,6 +90,8 @@ impl App {
         if let Some(paths) = &paths {
             let _ = paths.ensure_dirs();
         }
+        crate::logging::init(paths.as_ref().map(|p| p.data_dir.as_path()));
+        crate::logging::debug("app start");
         match cli_mode {
             Some(TestMode::Time(t)) => {
                 config.mode = Mode::Time;
@@ -97,6 +120,10 @@ impl App {
         let mut auth_worker = AuthWorker::spawn(auth.clone());
         // Restore a prior session off-thread so startup never blocks on network.
         auth_worker.submit(AuthRequest::Restore);
+        let api_worker = ApiWorker::spawn(
+            ApeClient::new(auth.clone()),
+            paths.as_ref().map(|p| p.results_file.clone()),
+        );
 
         Self {
             screen: Screen::Test,
@@ -109,8 +136,12 @@ impl App {
             last_key: None,
             paths,
             account: None,
+            auth_notice: None,
+            submission: SubmissionStatus::Idle,
+            last_event: None,
             auth,
             auth_worker,
+            api_worker,
             should_quit: false,
         }
     }
@@ -119,8 +150,14 @@ impl App {
         while !self.should_quit {
             terminal.draw(|f| self.draw(f))?;
             if event::poll(TICK)? {
-                if let Event::Key(key) = event::read()? {
-                    self.on_key(key);
+                match event::read()? {
+                    Event::Key(key) => self.on_key(key),
+                    Event::Paste(text) => {
+                        if let Screen::Login(state) = &mut self.screen {
+                            state.paste(&text);
+                        }
+                    }
+                    _ => {}
                 }
             }
             self.on_tick();
@@ -164,8 +201,14 @@ impl App {
                     self.auth_worker
                         .submit(AuthRequest::Email { email, password });
                 }
-                LoginAction::SubmitOAuth(provider) => {
-                    self.auth_worker.submit(AuthRequest::OAuth(provider));
+                LoginAction::StartOAuth(provider) => {
+                    self.auth_worker.submit(AuthRequest::OAuthBegin(provider));
+                }
+                LoginAction::FinishOAuth(url) => {
+                    self.auth_worker.submit(AuthRequest::OAuthFinish(url));
+                }
+                LoginAction::CancelOAuth => {
+                    self.auth_worker.submit(AuthRequest::OAuthCancel);
                 }
             }
             return;
@@ -183,6 +226,18 @@ impl App {
             Screen::Result(_) => match key.code {
                 KeyCode::Esc => Action::OpenMenu,
                 KeyCode::Tab | KeyCode::Enter => Action::Restart,
+                KeyCode::Char('r')
+                    if matches!(
+                        self.submission,
+                        SubmissionStatus::Failed {
+                            retryable: true,
+                            ..
+                        }
+                    ) =>
+                {
+                    self.retry_submission();
+                    Action::None
+                }
                 _ => Action::None,
             },
             Screen::Menu(state) => state.handle(key.code),
@@ -213,6 +268,7 @@ impl App {
                 self.screen = Screen::Themes(ui::theme_screen::ThemeState::new(&self.themes));
             }
             Action::OpenLogin => {
+                self.auth_notice = None;
                 self.screen = Screen::Login(ui::login_screen::LoginState::new());
             }
             Action::Logout => {
@@ -244,6 +300,7 @@ impl App {
             match event {
                 AuthEvent::LoggedIn(session) => {
                     self.account = Some(session);
+                    self.auth_notice = None;
                     // Interactive login closes the login screen; a background
                     // restore just updates state without disturbing the test.
                     if matches!(self.screen, Screen::Login(_)) {
@@ -254,7 +311,43 @@ impl App {
                 AuthEvent::Failed(msg) => {
                     if let Screen::Login(state) = &mut self.screen {
                         state.set_error(msg);
+                    } else {
+                        // The user navigated away mid-login; surface the
+                        // outcome in the menu instead of dropping it.
+                        self.auth_notice = Some(format!("login failed: {msg}"));
                     }
+                }
+                AuthEvent::OAuthPending {
+                    provider,
+                    auth_uri,
+                    open_failed,
+                } => {
+                    if let Screen::Login(state) = &mut self.screen {
+                        state.set_oauth_prompt(provider, auth_uri, open_failed);
+                    } else {
+                        // Flow abandoned before the URL came back.
+                        self.auth_worker.submit(AuthRequest::OAuthCancel);
+                    }
+                }
+                AuthEvent::Cancelled => {}
+            }
+        }
+
+        // Drain completed API operations.
+        if let Some(event) = self.api_worker.poll() {
+            match event {
+                ApiEvent::ResultPosted { outcome, session } => {
+                    // Propagate a mid-flight token refresh back to the account.
+                    if self.account.as_ref().is_some_and(|a| a.uid == session.uid) {
+                        self.account = Some(session);
+                    }
+                    self.submission = match outcome {
+                        Ok(data) => SubmissionStatus::Saved(data),
+                        Err(e) => SubmissionStatus::Failed {
+                            message: e.to_string(),
+                            retryable: e.is_retryable(),
+                        },
+                    };
                 }
             }
         }
@@ -268,8 +361,40 @@ impl App {
     fn check_finished(&mut self) {
         if self.session.state == SessionState::Finished {
             let stats = crate::engine::stats::compute(&self.session);
+            self.submission = self.submit_result(&stats);
             self.screen = Screen::Result(stats);
         }
+    }
+
+    /// Kick off result submission for the just-finished session, or explain
+    /// why it is skipped.
+    fn submit_result(&mut self, stats: &crate::engine::stats::FinalStats) -> SubmissionStatus {
+        use crate::engine::completed_event;
+        let Some(session) = self.account.clone() else {
+            return SubmissionStatus::Skipped("sign in to save results".into());
+        };
+        if !self.config.result_saving {
+            return SubmissionStatus::Skipped("result saving is disabled".into());
+        }
+        if let Some(reason) = completed_event::submission_block_reason(&self.session, stats) {
+            return SubmissionStatus::Skipped(format!("not saved: {reason}"));
+        }
+        let event = completed_event::build(&self.session, stats, &self.config, &session.uid);
+        self.last_event = Some(event.clone());
+        self.api_worker
+            .submit(ApiRequest::PostResult { session, event });
+        SubmissionStatus::InFlight
+    }
+
+    /// Resubmit the stashed event after a transient failure (`r` on the
+    /// result screen).
+    fn retry_submission(&mut self) {
+        let (Some(session), Some(event)) = (self.account.clone(), self.last_event.clone()) else {
+            return;
+        };
+        self.api_worker
+            .submit(ApiRequest::PostResult { session, event });
+        self.submission = SubmissionStatus::InFlight;
     }
 
     fn restart(&mut self) {
@@ -278,6 +403,8 @@ impl App {
             self.theme = theme::resolve(&self.config, &self.themes);
         }
         self.session = new_session(&self.config, &self.language, self.key_release_supported);
+        self.submission = SubmissionStatus::Idle;
+        self.last_event = None;
         self.screen = Screen::Test;
     }
 

@@ -1,6 +1,7 @@
 use monkeytype_tui::{app, engine};
 use ratatui::crossterm::event::{
-    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    DisableBracketedPaste, EnableBracketedPaste, KeyboardEnhancementFlags,
+    PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use ratatui::crossterm::{execute, terminal::supports_keyboard_enhancement};
 
@@ -36,9 +37,13 @@ fn main() -> std::io::Result<()> {
             )
         )?;
     }
+    // Bracketed paste delivers a pasted OAuth redirect URL as one event instead
+    // of hundreds of key events (see login screen).
+    let _ = execute!(std::io::stdout(), EnableBracketedPaste);
 
     let result = app::App::new(mode, key_release_supported).run(&mut terminal);
 
+    let _ = execute!(std::io::stdout(), DisableBracketedPaste);
     if key_release_supported {
         let _ = execute!(std::io::stdout(), PopKeyboardEnhancementFlags);
     }
